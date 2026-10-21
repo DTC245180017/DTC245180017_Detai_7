@@ -9,8 +9,14 @@ networks:
 volumes:
   db_data:
   wp_data:
+  prom_data:
+  grafana_data:
+  loki_data:
 
 services:
+  # ==========================================
+  # 1. DATABASE & QUẢN TRỊ DỮ LIỆU
+  # ==========================================
   db:
     image: mysql:8.0
     container_name: cms_mysql
@@ -24,6 +30,7 @@ services:
       - db_data:/var/lib/mysql
     networks:
       - backend_net
+    # Hardening: Không expose cổng 3306 ra ngoài host máy tính
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:latest
@@ -38,11 +45,14 @@ services:
     depends_on:
       - db
 
+  # ==========================================
+  # 2. ỨNG DỤNG WEB (WORDPRESS BLOG/CMS)
+  # ==========================================
   wordpress:
     image: wordpress:latest
     container_name: cms_wordpress
     restart: always
-    user: "33:33"
+    user: "33:33" # Hardening: Chạy với user non-root www-data (UID 33)
     environment:
       WORDPRESS_DB_HOST: db:3306
       WORDPRESS_DB_NAME: wordpress_db
@@ -56,6 +66,9 @@ services:
     depends_on:
       - db
 
+  # ==========================================
+  # 3. REVERSE PROXY & SSL (NGINX)
+  # ==========================================
   nginx:
     image: nginx:alpine
     container_name: cms_nginx
@@ -71,3 +84,82 @@ services:
     depends_on:
       - wordpress
       - phpmyadmin
+
+  # ==========================================
+  # 4. MONITORING (PROMETHEUS + GRAFANA + EXPORTERS)
+  # ==========================================
+  mysqld-exporter:
+    image: prom/mysqld-exporter:latest
+    container_name: cms_mysqld_exporter
+    restart: always
+    command:
+      - "--mysqld.address=db:3306"
+      - "--mysqld.username=exporter:exporterpass123"
+    networks:
+      - backend_net
+    depends_on:
+      - db
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cms_cadvisor
+    restart: always
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - frontend_net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: cms_prometheus
+    restart: always
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom_data:/prometheus
+    networks:
+      - frontend_net
+      - backend_net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: cms_grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=AdminPass2026!#
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - frontend_net
+    depends_on:
+      - prometheus
+
+  # ==========================================
+  # 5. LOGGING TẬP TRUNG (LOKI + PROMTAIL)
+  # ==========================================
+  loki:
+    image: grafana/loki:latest
+    container_name: cms_loki
+    restart: always
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    networks:
+      - frontend_net
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: cms_promtail
+    restart: always
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - frontend_net
+    depends_on:
+      - loki

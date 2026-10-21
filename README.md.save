@@ -1,0 +1,16 @@
+# Đề tài 7: Hệ thống Blog / CMS (WordPress + MySQL + phpMyAdmin)
+- Sinh viên thực hiện: DTC245180017
+- Môn học: Triển khai và Quản trị Hệ thống Phần mềm
+
+## Hướng dẫn khởi chạy:
+```bash
+docker compose up -d
+WordPress: https://192.168.118.129
+phpMyAdmin: https://192.168.118.129/pma/*Lưu file:* Nhấn `Ctrl + O` $\rightarrow$ `Enter` $\rightarrow$ `Ctrl + X`.
+
+---
+
+### 4. Khởi chạy hệ thống
+Sau khi tạo xong 3 file trên, chạy lệnh:
+```bash
+docker compose up -d
