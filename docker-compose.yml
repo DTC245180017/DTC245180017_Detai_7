@@ -11,7 +11,6 @@ volumes:
   wp_data:
   prom_data:
   grafana_data:
-  loki_data:
 
 services:
   # ==========================================
@@ -86,7 +85,7 @@ services:
       - phpmyadmin
 
   # ==========================================
-  # 4. MONITORING (PROMETHEUS + GRAFANA + EXPORTERS)
+  # 4. GIÁM SÁT (PROMETHEUS + GRAFANA + EXPORTERS)
   # ==========================================
   mysqld-exporter:
     image: prom/mysqld-exporter:latest
@@ -96,6 +95,7 @@ services:
       - "--mysqld.address=db:3306"
       - "--mysqld.username=exporter:exporterpass123"
     networks:
+      - frontend_net
       - backend_net
     depends_on:
       - db
@@ -139,15 +139,14 @@ services:
       - prometheus
 
   # ==========================================
-  # 5. LOGGING TẬP TRUNG (LOKI + PROMTAIL)
+  # 5. QUẢN LÝ LOG TẬP TRUNG (LOKI + PROMTAIL)
   # ==========================================
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:2.9.3
     container_name: cms_loki
     restart: always
     volumes:
       - ./loki/loki-config.yml:/etc/loki/local-config.yaml:ro
-      - loki_data:/loki
     networks:
       - frontend_net
 
@@ -155,6 +154,7 @@ services:
     image: grafana/promtail:latest
     container_name: cms_promtail
     restart: always
+    user: root
     volumes:
       - ./promtail/promtail-config.yml:/etc/promtail/config.yml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
